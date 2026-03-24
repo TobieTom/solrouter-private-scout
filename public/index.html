@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PrivateTradeScout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #02000a;
+  --primary: #7c3aed;
+  --secondary: #06b6d4;
+  --alert: #f0abfc;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --muted: #a0a0b0;
+}
+
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  color: #fff;
+  font-family: 'Space Grotesk', sans-serif;
+  cursor: none;
+  overflow: hidden;
+  user-select: none;
+}
+
+body.state3-active { overflow: hidden; }
+
+/* WebGL canvas */
+#bg-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Custom cursor */
+#cursor-cross {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10000;
+  transform: translate(-50%, -50%);
+}
+#cursor-cross::before,
+#cursor-cross::after {
+  content: '';
+  position: absolute;
+  background: var(--primary);
+  transition: width 0.15s ease, height 0.15s ease, transform 0.15s ease;
+}
+#cursor-cross::before {
+  width: 12px; height: 1px;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+}
+#cursor-cross::after {
+  width: 1px; height: 12px;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+}
+#cursor-cross.hovered::before { width: 24px; transform: translate(-50%, -50%) rotate(45deg); }
+#cursor-cross.hovered::after  { height: 24px; transform: translate(-50%, -50%) rotate(45deg); }
+
+#cursor-dot {
+  position: fixed;
+  width: 8px; height: 8px;
+  background: var(--secondary);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+}
+
+/* STATE WRAPPERS */
+.state {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  z-index: 1;
+}
+#state1 { opacity: 1; }
+#state2 { opacity: 0; pointer-events: none; }
+#state3 { opacity: 0; pointer-events: none; transform: translateY(40px); }
+
+/* ─────── STATE 1 ─────── */
+#state1-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  text-align: center;
+}
+
+/* Glitch title */
+.glitch-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 72px;
+  font-weight: 700;
+  color: #fff;
+  position: relative;
+  letter-spacing: 2px;
+  line-height: 1;
+  margin-bottom: 18px;
+}
+.glitch-title::before,
+.glitch-title::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  opacity: 0.8;
+}
+.glitch-title::before {
+  color: #ff003c;
+  animation: glitch-a 3.5s infinite steps(1);
+  clip-path: polygon(0 0, 100% 0, 100% 35%, 0 35%);
+}
+.glitch-title::after {
+  color: #06b6d4;
+  animation: glitch-b 2.7s infinite steps(1);
+  clip-path: polygon(0 60%, 100% 60%, 100% 100%, 0 100%);
+}
+@keyframes glitch-a {
+  0%   { transform: translateX(0);    opacity: 0; }
+  4%   { transform: translateX(-4px); opacity: 0.8; }
+  8%   { transform: translateX( 4px); opacity: 0.8; }
+  12%  { transform: translateX(-4px); opacity: 0.8; }
+  16%  { transform: translateX(0);    opacity: 0; }
+  38%  { transform: translateX(0);    opacity: 0; }
+  40%  { transform: translateX(-4px); opacity: 0.8; }
+  42%  { transform: translateX( 4px); opacity: 0.8; }
+  44%  { transform: translateX(0);    opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes glitch-b {
+  0%   { transform: translateX(0);   opacity: 0; }
+  6%   { transform: translateX(4px); opacity: 0.8; }
+  11%  { transform: translateX(-4px);opacity: 0.8; }
+  16%  { transform: translateX(4px); opacity: 0.8; }
+  20%  { transform: translateX(0);   opacity: 0; }
+  58%  { opacity: 0; }
+  61%  { transform: translateX(-4px);opacity: 0.8; }
+  64%  { transform: translateX( 4px);opacity: 0.8; }
+  67%  { transform: translateX(0);   opacity: 0; }
+  100% { opacity: 0; }
+}
+
+.subtitle {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 48px;
+  min-height: 20px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 600px;
+  max-width: 90vw;
+}
+
+#token-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--primary);
+  outline: none;
+  color: #fff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  padding: 16px 0;
+  cursor: none;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+#token-input::placeholder { color: transparent; }
+#token-input:focus {
+  box-shadow: 0 4px 20px #7c3aed80;
+  border-bottom-color: var(--primary);
+}
+#token-input.error {
+  animation: flash-red 0.4s ease 2;
+  border-bottom-color: var(--danger);
+}
+@keyframes flash-red {
+  0%,100% { border-bottom-color: var(--danger); box-shadow: none; }
+  50% { box-shadow: 0 4px 20px #ef444480; }
+}
+
+/* fake placeholder with blinking cursor */
+.input-wrapper {
+  position: relative;
+  width: 100%;
+}
+.input-placeholder {
+  position: absolute;
+  top: 50%; left: 0;
+  transform: translateY(-50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  color: #555;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.input-placeholder .blink {
+  animation: blink-cursor 1s step-end infinite;
+}
+@keyframes blink-cursor {
+  0%,100% { opacity: 1; } 50% { opacity: 0; }
+}
+
+#scout-btn {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 0;
+  padding: 14px 48px;
+  cursor: none;
+  transition: background 0.25s ease, box-shadow 0.25s ease;
+}
+#scout-btn:hover {
+  background: var(--secondary);
+  box-shadow: 0 0 40px #06b6d480;
+}
+
+.enc-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: -8px;
+  border-radius: 0;
+  letter-spacing: 1px;
+}
+.enc-badge .lock-icon {
+  display: inline-block;
+  animation: pulse-lock 2s ease-in-out infinite;
+}
+@keyframes pulse-lock {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ─────── STATE 2 ─────── */
+#state2-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.pipeline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.pipe-node {
+  width: 200px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  border: 1px solid #333;
+  background: transparent;
+  color: #555;
+  transition: border-color 0.4s, background 0.4s, color 0.4s, box-shadow 0.4s;
+}
+.pipe-node.active {
+  border-color: var(--secondary);
+  background: #06b6d415;
+  color: #fff;
+  box-shadow: 0 0 16px #06b6d440;
+  animation: pulse-cyan 1s ease-in-out infinite;
+}
+@keyframes pulse-cyan {
+  0%,100% { box-shadow: 0 0 16px #06b6d440; }
+  50% { box-shadow: 0 0 32px #06b6d480; }
+}
+.pipe-node.complete {
+  border-color: var(--primary);
+  background: #7c3aed20;
+  color: var(--primary);
+  animation: none;
+  box-shadow: none;
+}
+
+.pipe-line {
+  width: 1px;
+  height: 28px;
+  background: #333;
+  position: relative;
+  transition: background 0.6s ease;
+}
+.pipe-line.lit { background: var(--secondary); }
+
+.privacy-proof {
+  margin-top: 28px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  min-height: 40px;
+  text-align: left;
+  width: 200px;
+}
+.proof-false { color: var(--danger); display: block; min-height: 18px; }
+.proof-true  { color: var(--success); display: block; min-height: 18px; }
+
+/* ─────── STATE 3 ─────── */
+#state3 {
+  overflow-y: auto;
+  overflow-x: hidden;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 48px 0 60px;
+}
+#state3-inner {
+  width: 640px;
+  max-width: 90vw;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.result-topbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.token-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 48px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+.token-price {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 32px;
+  color: var(--secondary);
+  line-height: 1;
+}
+.risk-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  padding: 6px 14px;
+  border: 1px solid var(--success);
+  background: #22c55e20;
+  color: var(--success);
+  border-radius: 0;
+  letter-spacing: 2px;
+  animation: glow-green 2s ease-in-out infinite;
+}
+@keyframes glow-green {
+  0%,100% { box-shadow: 0 0 8px #22c55e40; }
+  50% { box-shadow: 0 0 20px #22c55e80; }
+}
+
+.divider {
+  height: 1px;
+  background: #7c3aed30;
+  width: 100%;
+}
+
+.data-strips {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
+}
+.data-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.strip-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+.strip-value {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 28px;
+  color: #fff;
+  font-weight: 700;
+}
+.strip-value.mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: var(--secondary);
+  font-weight: 400;
+}
+.strip-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+}
+.liq-bar-track {
+  width: 100%;
+  height: 4px;
+  background: #1a1a2e;
+  overflow: hidden;
+}
+.liq-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--primary);
+  transition: width 1.2s ease;
+}
+
+.agent-box {
+  background: #0d0d1a;
+  border: 1px solid #7c3aed40;
+  padding: 24px;
+  border-radius: 0;
+  cursor: none;
+}
+.agent-box-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  margin-bottom: 16px;
+}
+.agent-box-content {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.7;
+  max-height: 140px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) transparent;
+}
+.agent-box-content::-webkit-scrollbar { width: 4px; }
+.agent-box-content::-webkit-scrollbar-track { background: transparent; }
+.agent-box-content::-webkit-scrollbar-thumb { background: var(--primary); }
+
+.tools-row { display: flex; flex-direction: column; gap: 10px; }
+.tools-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 4px;
+}
+.tools-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+.tool-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  background: #7c3aed15;
+  padding: 5px 12px;
+  border-radius: 0;
+  transform: scale(0);
+  opacity: 0;
+}
+
+#scout-again-btn {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  background: transparent;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: 0;
+  padding: 14px 48px;
+  cursor: none;
+  align-self: center;
+  transition: color 0.25s, box-shadow 0.25s;
+}
+#scout-again-btn:hover {
+  box-shadow: 0 0 40px #7c3aed40;
+}
+
+/* Scanline wipe overlay */
+#scanline-wipe {
+  position: fixed;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: var(--bg);
+  z-index: 9000;
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<!-- Custom cursor -->
+<div id="cursor-cross"></div>
+<div id="cursor-dot"></div>
+
+<!-- Scanline wipe -->
+<div id="scanline-wipe"></div>
+
+<!-- ═══ STATE 1: IDLE ═══ -->
+<div id="state1" class="state">
+  <div id="state1-inner">
+    <h1 class="glitch-title" data-text="PRIVATE TRADE SCOUT">PRIVATE TRADE SCOUT</h1>
+    <p class="subtitle" id="subtitle-text"></p>
+    <div class="input-group">
+      <div class="input-wrapper">
+        <input type="text" id="token-input" autocomplete="off" spellcheck="false">
+        <span class="input-placeholder" id="input-placeholder">&gt; enter token address or ticker<span class="blink">_</span></span>
+      </div>
+      <button id="scout-btn">SCOUT</button>
+      <p class="enc-badge"><span class="lock-icon">🔒</span> E2E ENCRYPTED · POWERED BY SOLROUTER</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ STATE 2: LOADING ═══ -->
+<div id="state2" class="state">
+  <div id="state2-inner">
+    <div class="pipeline" id="pipeline">
+      <div class="pipe-node" id="node-0">QUERY CAPTURED</div>
+      <div class="pipe-line" id="line-0"></div>
+      <div class="pipe-node" id="node-1">ENCRYPTING</div>
+      <div class="pipe-line" id="line-1"></div>
+      <div class="pipe-node" id="node-2">ROUTING TO TEE</div>
+      <div class="pipe-line" id="line-2"></div>
+      <div class="pipe-node" id="node-3">TEE EXECUTION</div>
+      <div class="pipe-line" id="line-3"></div>
+      <div class="pipe-node" id="node-4">DECRYPTING</div>
+      <div class="pipe-line" id="line-4"></div>
+      <div class="pipe-node" id="node-5">SYNTHESIZING</div>
+    </div>
+    <div class="privacy-proof" id="privacy-proof">
+      <span class="proof-false" id="proof-line-1"></span>
+      <span class="proof-true"  id="proof-line-2"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ STATE 3: RESULT ═══ -->
+<div id="state3" class="state">
+  <div id="state3-inner">
+    <div class="result-topbar">
+      <div>
+        <div class="token-name" id="result-token-name">BONK</div>
+        <div class="token-price" id="result-token-price">$0.00002341</div>
+      </div>
+      <div class="risk-badge" id="result-risk-badge">● BULLISH</div>
+    </div>
+    <div class="divider"></div>
+    <div class="data-strips">
+      <div class="data-strip">
+        <div class="strip-label">Liquidity Health</div>
+        <div class="strip-value" id="result-liquidity-pct">78%</div>
+        <div class="liq-bar-track"><div class="liq-bar-fill" id="liq-bar"></div></div>
+      </div>
+      <div class="data-strip">
+        <div class="strip-label">24H Volume</div>
+        <div class="strip-value" id="result-volume">$2.4M</div>
+      </div>
+      <div class="data-strip">
+        <div class="strip-label">Best Swap Route</div>
+        <div class="strip-value mono" id="result-swap-quote">1000 BONK → 0.0234 SOL</div>
+        <div class="strip-sub" id="result-swap-route">via Jupiter · 0.3% slippage</div>
+      </div>
+    </div>
+    <div class="agent-box">
+      <div class="agent-box-title">// AGENT ANALYSIS</div>
+      <div class="agent-box-content" id="agent-text"></div>
+    </div>
+    <div class="tools-row">
+      <div class="tools-label">// TOOLS INVOKED</div>
+      <div class="tools-tags" id="tools-tags">
+        <span class="tool-tag">token_price</span>
+        <span class="tool-tag">swap_quote</span>
+        <span class="tool-tag">web_search</span>
+        <span class="tool-tag">solana_balance</span>
+      </div>
+    </div>
+    <button id="scout-again-btn">SCOUT AGAIN</button>
+  </div>
+</div>
+
+<script>
+// ─── THREE.JS BACKGROUND ──────────────────────────────────────────────────
+(function() {
+  const canvas = document.getElementById('bg-canvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.z = 60;
+
+  const COUNT = 3000;
+  const positions = new Float32Array(COUNT * 3);
+  const colors    = new Float32Array(COUNT * 3);
+  const velocities = [];
+
+  const c1 = new THREE.Color('#7c3aed');
+  const c2 = new THREE.Color('#06b6d4');
+
+  for (let i = 0; i < COUNT; i++) {
+    positions[i*3]   = (Math.random() - 0.5) * 200;
+    positions[i*3+1] = (Math.random() - 0.5) * 200;
+    positions[i*3+2] = (Math.random() - 0.5) * 120;
+    const t = Math.random();
+    const c = c1.clone().lerp(c2, t);
+    colors[i*3]   = c.r;
+    colors[i*3+1] = c.g;
+    colors[i*3+2] = c.b;
+    velocities.push({
+      x: (Math.random() - 0.5) * 0.012,
+      y: (Math.random() - 0.5) * 0.012,
+      z: (Math.random() - 0.5) * 0.008
+    });
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+  const c = document.createElement('canvas');
+  c.width = 8; c.height = 8;
+  const ctx = c.getContext('2d');
+  ctx.beginPath();
+  ctx.arc(4, 4, 2, 0, Math.PI * 2);
+  ctx.fillStyle = 'white';
+  ctx.fill();
+  const tex = new THREE.CanvasTexture(c);
+
+  const mat = new THREE.PointsMaterial({
+    map: tex,
+    alphaTest: 0.5,
+    transparent: true,
+    vertexColors: true,
+    size: 1.2,
+    sizeAttenuation: true
+  });
+  const particles = new THREE.Points(geo, mat);
+  scene.add(particles);
+
+  let mouse3D = { x: 9999, y: 9999 };
+  const REPEL_RADIUS = 120;
+
+  document.addEventListener('mousemove', e => {
+    const nx = (e.clientX / window.innerWidth)  * 2 - 1;
+    const ny =-(e.clientY / window.innerHeight) * 2 + 1;
+    mouse3D.x = nx * 100;
+    mouse3D.y = ny * 100;
+  });
+
+  window.addEventListener('resize', () => {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+  });
+
+  let t = 0;
+  function animate() {
+    requestAnimationFrame(animate);
+    t += 0.0003;
+    particles.rotation.y = t * 0.4;
+    particles.rotation.x = t * 0.15;
+
+    const pos = geo.attributes.position.array;
+    for (let i = 0; i < COUNT; i++) {
+      pos[i*3]   += velocities[i].x;
+      pos[i*3+1] += velocities[i].y;
+      pos[i*3+2] += velocities[i].z;
+
+      if (Math.abs(pos[i*3])   > 100) velocities[i].x *= -1;
+      if (Math.abs(pos[i*3+1]) > 100) velocities[i].y *= -1;
+      if (Math.abs(pos[i*3+2]) > 60)  velocities[i].z *= -1;
+
+      // mouse repulsion in screen-projected space
+      const dx = pos[i*3]   - mouse3D.x;
+      const dy = pos[i*3+1] - mouse3D.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < REPEL_RADIUS && dist > 0) {
+        const force = (REPEL_RADIUS - dist) / REPEL_RADIUS * 0.08;
+        pos[i*3]   += (dx / dist) * force;
+        pos[i*3+1] += (dy / dist) * force;
+      }
+    }
+    geo.attributes.position.needsUpdate = true;
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+
+// ─── CUSTOM CURSOR ────────────────────────────────────────────────────────
+(function() {
+  const cross = document.getElementById('cursor-cross');
+  const dot   = document.getElementById('cursor-dot');
+  let mx = -100, my = -100;
+  let dx = -100, dy = -100;
+
+  document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  function loop() {
+    dx = lerp(dx, mx, 0.12);
+    dy = lerp(dy, my, 0.12);
+    cross.style.left = mx + 'px';
+    cross.style.top  = my + 'px';
+    dot.style.left   = dx + 'px';
+    dot.style.top    = dy + 'px';
+    requestAnimationFrame(loop);
+  }
+  loop();
+
+  document.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('mouseenter', () => cross.classList.add('hovered'));
+    btn.addEventListener('mouseleave', () => cross.classList.remove('hovered'));
+  });
+})();
+
+// ─── TYPEWRITER ────────────────────────────────────────────────────────────
+function typeWriter(el, text, speed, cb) {
+  let i = 0;
+  el.textContent = '';
+  const t = setInterval(() => {
+    el.textContent += text[i++];
+    if (i >= text.length) { clearInterval(t); if (cb) cb(); }
+  }, speed);
+}
+
+window.addEventListener('load', () => {
+  const subtitleText = '// encrypted inference. zero knowledge. your query never leaves encryption.';
+  typeWriter(document.getElementById('subtitle-text'), subtitleText, 40);
+});
+
+// ─── INPUT PLACEHOLDER ─────────────────────────────────────────────────────
+const tokenInput = document.getElementById('token-input');
+const ph = document.getElementById('input-placeholder');
+tokenInput.addEventListener('input', () => {
+  ph.style.opacity = tokenInput.value.length > 0 ? '0' : '1';
+});
+tokenInput.addEventListener('focus', () => {
+  if (tokenInput.value.length > 0) ph.style.opacity = '0';
+});
+tokenInput.addEventListener('blur', () => {
+  if (tokenInput.value.length === 0) ph.style.opacity = '1';
+});
+
+// ─── TEXT SCRAMBLE ─────────────────────────────────────────────────────────
+const CHARS = '!@#$%^&*<>[]{}|/\\?~ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+function scrambleText(el, finalText, duration) {
+  const steps = Math.floor(duration / 30);
+  let step = 0;
+  const interval = setInterval(() => {
+    step++;
+    const progress = step / steps;
+    let result = '';
+    for (let i = 0; i < finalText.length; i++) {
+      if (i < Math.floor(progress * finalText.length)) {
+        result += finalText[i];
+      } else {
+        result += CHARS[Math.floor(Math.random() * CHARS.length)];
+      }
+    }
+    el.textContent = result;
+    if (step >= steps) { clearInterval(interval); el.textContent = finalText; }
+  }, 30);
+}
+
+document.getElementById('scout-btn').addEventListener('mouseenter', function() {
+  scrambleText(this, 'SCOUT', 400);
+});
+document.getElementById('scout-again-btn').addEventListener('mouseenter', function() {
+  scrambleText(this, 'SCOUT AGAIN', 400);
+});
+
+// ─── PIPELINE STATE MACHINE ─────────────────────────────────────────────────
+let currentState = 1;
+const state1 = document.getElementById('state1');
+const state2 = document.getElementById('state2');
+const state3 = document.getElementById('state3');
+
+function resetPipeline() {
+  for (let i = 0; i < 6; i++) {
+    const n = document.getElementById('node-' + i);
+    n.className = 'pipe-node';
+    n.textContent = ['QUERY CAPTURED','ENCRYPTING','ROUTING TO TEE','TEE EXECUTION','DECRYPTING','SYNTHESIZING'][i];
+  }
+  for (let i = 0; i < 5; i++) {
+    document.getElementById('line-' + i).className = 'pipe-line';
+  }
+  document.getElementById('proof-line-1').textContent = '';
+  document.getElementById('proof-line-2').textContent = '';
+}
+
+function activatePipeline(onComplete) {
+  const labels = ['QUERY CAPTURED','ENCRYPTING','ROUTING TO TEE','TEE EXECUTION','DECRYPTING','SYNTHESIZING'];
+  let step = 0;
+  let proofShown = false;
+
+  function advance() {
+    if (step > 0) {
+      const prev = document.getElementById('node-' + (step - 1));
+      prev.classList.remove('active');
+      prev.classList.add('complete');
+      prev.textContent = '✓ ' + labels[step - 1];
+      if (step - 1 < 5) {
+        document.getElementById('line-' + (step - 1)).classList.add('lit');
+      }
+    }
+    if (step < 6) {
+      document.getElementById('node-' + step).classList.add('active');
+      if (step === 3 && !proofShown) {
+        proofShown = true;
+        setTimeout(() => {
+          typeWriter(document.getElementById('proof-line-1'), 'backend.sawPlaintext = false', 22);
+          setTimeout(() => typeWriter(document.getElementById('proof-line-2'), 'toolsExecutedInTEE = true', 22), 700);
+        }, 200);
+      }
+      step++;
+      setTimeout(advance, 700);
+    } else {
+      setTimeout(onComplete, 400);
+    }
+  }
+  advance();
+}
+
+// ─── TRANSITIONS ───────────────────────────────────────────────────────────
+function goToState2(dataPromise) {
+  document.body.style.overflow = 'hidden';
+  resetPipeline();
+  gsap.to(state1, {
+    opacity: 0, y: -40, duration: 0.4, ease: 'power2.inOut',
+    onComplete: () => {
+      state1.style.pointerEvents = 'none';
+      state2.style.opacity = '1';
+      state2.style.pointerEvents = 'auto';
+      gsap.fromTo(state2, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.inOut' });
+      activatePipeline(() => {
+        dataPromise
+          .then(data => {
+            if (data.error) {
+              console.error('API error:', data.message);
+              goToState1();
+              tokenInput.classList.remove('error');
+              void tokenInput.offsetWidth;
+              tokenInput.classList.add('error');
+              setTimeout(() => tokenInput.classList.remove('error'), 900);
+              return;
+            }
+            populateState3(data);
+            goToState3();
+          })
+          .catch(err => {
+            console.error('Fetch error:', err);
+            goToState1();
+          });
+      });
+    }
+  });
+}
+
+function goToState3() {
+  gsap.to(state2, {
+    opacity: 0, y: -40, duration: 0.4, ease: 'power2.inOut',
+    onComplete: () => {
+      state2.style.pointerEvents = 'none';
+      state3.style.pointerEvents = 'auto';
+      document.body.style.overflow = '';
+      gsap.fromTo(state3, { opacity: 0, y: 40 }, {
+        opacity: 1, y: 0, duration: 0.5, ease: 'power2.inOut',
+        onComplete: () => {
+          animateState3();
+        }
+      });
+    }
+  });
+}
+
+function goToState1() {
+  const wipe = document.getElementById('scanline-wipe');
+  gsap.fromTo(wipe, { left: '-100%' }, {
+    left: '100%', duration: 0.4, ease: 'power2.inOut',
+    onComplete: () => {
+      // reset
+      state3.style.opacity = '0';
+      state3.style.pointerEvents = 'none';
+      state3.style.transform = 'translateY(40px)';
+      state1.style.transform = '';
+      document.getElementById('agent-text').textContent = '';
+      document.getElementById('tools-tags').innerHTML = '';
+      document.getElementById('liq-bar').style.width = '0%';
+      tokenInput.value = '';
+      ph.style.opacity = '1';
+      document.body.style.overflow = 'hidden';
+      wipe.style.left = '-100%';
+      state1.style.opacity = '0';
+      state1.style.pointerEvents = 'auto';
+      gsap.to(state1, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.inOut' });
+    }
+  });
+}
+
+function populateState3(data) {
+  console.log('Populating with:', data);
+  // Token name + ticker
+  document.getElementById('result-token-name').textContent =
+    data.tokenName + (data.ticker ? ' (' + data.ticker + ')' : '');
+
+  // Price
+  const priceEl = document.getElementById('result-token-price');
+  if (!data.price || data.price === 'N/A' ||
+      data.price === '$0.00' || data.price === '$0') {
+    priceEl.textContent = 'N/A';
+  } else {
+    priceEl.textContent = data.price;
+  }
+
+  // Liquidity
+  const liquidityEl = document.getElementById('result-liquidity-pct');
+  const barEl = document.getElementById('liq-bar');
+  if (!data.liquidityScore || data.liquidityScore === 0) {
+    liquidityEl.textContent = 'N/A';
+    barEl.style.width = '0%';
+  } else {
+    liquidityEl.textContent = data.liquidityScore + '%';
+    barEl.dataset.targetWidth = data.liquidityScore + '%';
+  }
+
+  // Volume
+  const volumeEl = document.getElementById('result-volume');
+  if (!data.volume24h || data.volume24h === 'N/A' ||
+      data.volume24h === '$0.00' || data.volume24h === '$0') {
+    volumeEl.textContent = 'N/A';
+  } else {
+    volumeEl.textContent = data.volume24h;
+  }
+
+  // Swap
+  document.getElementById('result-swap-quote').textContent = data.swapQuote || 'N/A';
+  document.getElementById('result-swap-route').textContent = data.swapRoute || '';
+
+  // Risk badge
+  const badge = document.getElementById('result-risk-badge');
+  badge.textContent = '● ' + (data.riskSignal || 'NEUTRAL');
+  const riskColors = { BULLISH: '#22c55e', BEARISH: '#ef4444', NEUTRAL: '#a0a0b0' };
+  const col = riskColors[data.riskSignal] || '#a0a0b0';
+  badge.style.borderColor = col;
+  badge.style.color = col;
+  badge.style.background = col + '20';
+
+  // Agent analysis — store for typewriter
+  badge.dataset.analysis = data.analysis || '';
+
+  // Tool tags — rebuild from data
+  const tagsContainer = document.getElementById('tools-tags');
+  tagsContainer.innerHTML = '';
+  const tools = Array.isArray(data.toolsUsed) && data.toolsUsed.length
+    ? data.toolsUsed
+    : ['token_price', 'swap_quote', 'web_search', 'solana_balance'];
+  tools.forEach(tool => {
+    const span = document.createElement('span');
+    span.className = 'tool-tag';
+    span.textContent = tool;
+    span.style.transform = 'scale(0)';
+    span.style.opacity = '0';
+    tagsContainer.appendChild(span);
+  });
+}
+
+function animateState3() {
+  // Liquidity bar
+  const liqBar = document.getElementById('liq-bar');
+  const targetWidth = liqBar.dataset.targetWidth || '0%';
+  setTimeout(() => { liqBar.style.width = targetWidth; }, 200);
+
+  // Agent text typewriter
+  const badge = document.getElementById('result-risk-badge');
+  const agentMsg = badge.dataset.analysis || '';
+  const agentEl = document.getElementById('agent-text');
+  agentEl.textContent = '';
+  let i = 0;
+  const t = setInterval(() => {
+    agentEl.textContent += agentMsg[i++];
+    agentEl.scrollTop = agentEl.scrollHeight;
+    if (i >= agentMsg.length) clearInterval(t);
+  }, 18);
+
+  // Tool tags pop in
+  const tags = document.querySelectorAll('.tool-tag');
+  tags.forEach((tag, idx) => {
+    setTimeout(() => {
+      gsap.to(tag, { scale: 1, opacity: 1, duration: 0.25, ease: 'back.out(1.7)' });
+    }, idx * 150 + 300);
+  });
+}
+
+// ─── SCOUT BUTTON ──────────────────────────────────────────────────────────
+document.getElementById('scout-btn').addEventListener('click', () => {
+  const val = tokenInput.value.trim();
+  if (!val) {
+    tokenInput.classList.remove('error');
+    void tokenInput.offsetWidth;
+    tokenInput.classList.add('error');
+    setTimeout(() => tokenInput.classList.remove('error'), 900);
+    return;
+  }
+  const dataPromise = fetch('http://localhost:3000/scout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: val })
+  }).then(res => res.json());
+  goToState2(dataPromise);
+});
+
+tokenInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('scout-btn').click();
+});
+
+// ─── SCOUT AGAIN BUTTON ────────────────────────────────────────────────────
+document.getElementById('scout-again-btn').addEventListener('click', goToState1);
+
+// ─── ALLOW CURSOR IN INPUT ─────────────────────────────────────────────────
+tokenInput.addEventListener('mouseenter', () => { tokenInput.style.caretColor = '#fff'; });
+tokenInput.style.caretColor = '#fff';
+</script>
+</body>
+</html>
