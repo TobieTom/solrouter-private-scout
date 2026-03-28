@@ -1032,7 +1032,7 @@ document.getElementById('scout-btn').addEventListener('click', () => {
     setTimeout(() => tokenInput.classList.remove('error'), 900);
     return;
   }
-  const dataPromise = fetch('http://localhost:3000/scout', {
+  const dataPromise = fetch('/scout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query: val })
